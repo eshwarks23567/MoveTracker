@@ -1,0 +1,44 @@
+# Data
+data/
+*.dat
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+dist/
+build/
+.eggs/
+*.egg
+
+# Virtual environment
+venv/
+env/
+.venv/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Results (keep structure, ignore large files)
+results/checkpoints/*.pt
+results/checkpoints/*.pth
+results/*.onnx
+results/*.tflite
+results/tf_savedmodel/
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Logs
+*.log
+wandb/
+runs/

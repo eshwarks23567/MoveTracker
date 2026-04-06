@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>HAR — Human Activity Recognition</title>
+    <meta name="description" content="Real-time Human Activity Recognition using smartphone sensors and deep learning">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="app.css">
+</head>
+<body>
+    <div id="app">
+        <!-- Status Bar -->
+        <div class="status-bar">
+            <span class="status-time" id="statusTime">9:41</span>
+            <div class="status-icons">
+                <svg width="16" height="12" viewBox="0 0 16 12"><path d="M1 9h2v3H1zM5 6h2v6H5zM9 3h2v9H9zM13 0h2v12h-2z" fill="currentColor"/></svg>
+                <svg width="16" height="12" viewBox="0 0 16 12"><path d="M8 2C5.24 2 2.79 3.22 1.17 5.17l1.42 1.42A7.45 7.45 0 018 4a7.45 7.45 0 015.41 2.59l1.42-1.42A9.45 9.45 0 008 2zm0 4c-1.7 0-3.23.69-4.35 1.81L5.07 9.22A4.48 4.48 0 018 8c1.13 0 2.16.42 2.93 1.11l1.42-1.42A6.48 6.48 0 008 6zm0 4a2.5 2.5 0 00-1.76.73L8 12.5l1.76-1.77A2.5 2.5 0 008 10z" fill="currentColor"/></svg>
+                <div class="battery-icon"><div class="battery-fill"></div></div>
+            </div>
+        </div>
+
+        <!-- Header -->
+        <header class="header">
+            <div class="header-top">
+                <div class="logo-section">
+                    <div class="logo-icon">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M18 20V10M12 20V4M6 20v-6"/>
+                        </svg>
+                    </div>
+                    <div>
+                        <h1>HAR System</h1>
+                        <p class="subtitle">Activity Recognition</p>
+                    </div>
+                </div>
+                <button class="settings-btn" id="settingsBtn" aria-label="Settings">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="3"/><path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83"/>
+                    </svg>
+                </button>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Activity Display -->
+            <section class="activity-card" id="activityCard">
+                <div class="activity-ring" id="activityRing">
+                    <svg viewBox="0 0 200 200" class="ring-svg">
+                        <circle cx="100" cy="100" r="85" class="ring-bg"/>
+                        <circle cx="100" cy="100" r="85" class="ring-progress" id="ringProgress" 
+                                stroke-dasharray="534" stroke-dashoffset="134"/>
+                    </svg>
+                    <div class="activity-center">
+                        <div class="activity-emoji" id="activityEmoji">🚶</div>
+                        <div class="activity-label" id="activityLabel">Walking</div>
+                        <div class="activity-confidence" id="activityConfidence">87%</div>
+                    </div>
+                </div>
+                <div class="activity-status">
+                    <div class="status-dot active" id="statusDot"></div>
+                    <span id="statusText">Recognizing activities...</span>
+                </div>
+            </section>
+
+            <!-- Confidence Bars -->
+            <section class="confidence-section">
+                <h2 class="section-title">Class Probabilities</h2>
+                <div class="confidence-bars" id="confidenceBars">
+                    <!-- Populated by JS -->
+                </div>
+            </section>
+
+            <!-- Sensor Data -->
+            <section class="sensor-section">
+                <h2 class="section-title">Live Sensor Data</h2>
+                <div class="sensor-tabs">
+                    <button class="sensor-tab active" data-sensor="accel" id="tabAccel">Accelerometer</button>
+                    <button class="sensor-tab" data-sensor="gyro" id="tabGyro">Gyroscope</button>
+                </div>
+                <div class="sensor-chart" id="sensorChart">
+                    <canvas id="sensorCanvas" width="400" height="180"></canvas>
+                </div>
+                <div class="sensor-values" id="sensorValues">
+                    <div class="sensor-axis x"><span class="axis-label">X</span><span class="axis-value" id="axisX">0.00</span></div>
+                    <div class="sensor-axis y"><span class="axis-label">Y</span><span class="axis-value" id="axisY">0.00</span></div>
+                    <div class="sensor-axis z"><span class="axis-label">Z</span><span class="axis-value" id="axisZ">0.00</span></div>
+                </div>
+            </section>
+
+            <!-- Activity History -->
+            <section class="history-section">
+                <h2 class="section-title">Activity Timeline</h2>
+                <div class="history-list" id="historyList">
+                    <!-- Populated by JS -->
+                </div>
+            </section>
+
+            <!-- Stats Cards -->
+            <section class="stats-section">
+                <h2 class="section-title">Session Stats</h2>
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-icon">⏱️</div>
+                        <div class="stat-value" id="statDuration">00:00</div>
+                        <div class="stat-label">Duration</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon">📊</div>
+                        <div class="stat-value" id="statInferences">0</div>
+                        <div class="stat-label">Inferences</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon">⚡</div>
+                        <div class="stat-value" id="statLatency">0ms</div>
+                        <div class="stat-label">Latency</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon">🎯</div>
+                        <div class="stat-value" id="statAvgConf">0%</div>
+                        <div class="stat-label">Avg Conf.</div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Model Info -->
+            <section class="model-section">
+                <h2 class="section-title">Model Info</h2>
+                <div class="model-card">
+                    <div class="model-row"><span>Architecture</span><span class="model-value">CNN-LSTM Hybrid</span></div>
+                    <div class="model-row"><span>Parameters</span><span class="model-value">847K</span></div>
+                    <div class="model-row"><span>Quantization</span><span class="model-value">INT8</span></div>
+                    <div class="model-row"><span>Model Size</span><span class="model-value">2.1 MB</span></div>
+                    <div class="model-row"><span>Window Size</span><span class="model-value">256 × 12</span></div>
+                    <div class="model-row"><span>Sample Rate</span><span class="model-value">50 Hz</span></div>
+                </div>
+            </section>
+        </main>
+
+        <!-- Bottom Control Bar -->
+        <div class="control-bar">
+            <button class="control-btn" id="btnStart" aria-label="Start recognition">
+                <div class="control-btn-inner start">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+                        <polygon points="5,3 19,12 5,21"/>
+                    </svg>
+                </div>
+                <span>Start</span>
+            </button>
+            <button class="control-btn" id="btnPause" aria-label="Pause recognition">
+                <div class="control-btn-inner pause">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+                        <rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/>
+                    </svg>
+                </div>
+                <span>Pause</span>
+            </button>
+            <button class="control-btn" id="btnReset" aria-label="Reset session">
+                <div class="control-btn-inner reset">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="23,4 23,10 17,10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
+                    </svg>
+                </div>
+                <span>Reset</span>
+            </button>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
