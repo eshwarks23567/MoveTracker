@@ -33,7 +33,7 @@
 
 ## 1. Abstract
 
-This project presents a complete Human Activity Recognition (HAR) system that classifies seven physical activities—lying, sitting, standing, walking, running, cycling, and ascending stairs—from wearable inertial measurement unit (IMU) sensor data. The system implements the full machine learning lifecycle, from raw data ingestion and signal preprocessing through to model training, evaluation using Leave-One-Subject-Out (LOSO) cross-validation, and mobile deployment via TensorFlow Lite. Both classical machine learning baselines (Random Forest, SVM, XGBoost) and deep learning architectures (1D CNN, Bidirectional LSTM, Bidirectional GRU, and a CNN-LSTM Hybrid with temporal attention) are developed and compared. A domain adaptation pipeline bridges the gap between laboratory-grade body-worn sensors and consumer smartphone hardware. The best-performing model is exported to TensorFlow Lite with INT8 quantization, targeting sub-20 ms inference and under 5 MB model size on mid-range smartphones.
+This project presents a complete Human Activity Recognition (HAR) system that classifies seven physical activities—lying, sitting, standing, walking, running, cycling, and ascending stairs—from wearable inertial measurement unit (IMU) sensor data. The system implements the full machine learning lifecycle, from raw data ingestion and signal preprocessing through to model training, evaluation using Leave-One-Subject-Out (LOSO) cross-validation, and mobile deployment via TensorFlow Lite. Both classical machine learning baselines (Random Forest, SVM, XGBoost) and deep learning architectures (1D CNN, Bidirectional LSTM, Bidirectional GRU, and a CNN-LSTM Hybrid with temporal attention) are developed and compared. The current methodology strengthens posture-sensitive classes by adding orientation-aware features, class-weighted loss, and temporal majority-vote smoothing. A domain adaptation pipeline bridges the gap between laboratory-grade body-worn sensors and consumer smartphone hardware. The best-performing model is exported to TensorFlow Lite with INT8 quantization, targeting sub-20 ms inference and under 5 MB model size on mid-range smartphones.
 
 ---
 
@@ -47,7 +47,7 @@ Human Activity Recognition aims to automatically detect and classify the physica
 
 The primary objectives of this work are:
 
-1. **Build a robust preprocessing pipeline** for the PAMAP2 dataset that handles missing values, removes high-frequency noise, and segments continuous data into fixed-length windows.
+1. **Build a robust preprocessing pipeline** for the PAMAP2 dataset that handles missing values, removes high-frequency noise, segments continuous data into fixed-length windows, and augments posture-sensitive accelerometer channels with orientation cues.
 2. **Develop and compare multiple model families** — classical ML models using handcrafted features and deep learning models that learn representations end-to-end from raw sensor signals.
 3. **Evaluate generalization** using Leave-One-Subject-Out (LOSO) cross-validation, which tests each model's ability to recognize activities for unseen users.
 4. **Deploy the best model to mobile** via a PyTorch → ONNX → TensorFlow Lite conversion pipeline, with quantization for efficient on-device inference.
@@ -119,14 +119,24 @@ The continuous time-series is segmented into fixed-length windows using a slidin
 | Overlap         | 50%             | Step of 128 samples; balances data volume and redundancy |
 | Labelling       | Majority vote   | Each window inherits the most frequent activity label within it |
 
-### 5.4 Normalization
+### 5.4 Orientation-Aware Feature Augmentation
+
+To improve separation of static postures such as sitting and standing, the preprocessing pipeline appends gravity-oriented features to each accelerometer triad used by the deep models:
+
+- `pitch = arctan2(ax, sqrt(ay^2 + az^2))`
+- `roll = arctan2(ay, sqrt(ax^2 + az^2))`
+- `acc_mag = sqrt(ax^2 + ay^2 + az^2)`
+
+These features expose device orientation relative to gravity, which is often the main difference between sitting and standing even when the raw motion amplitude is low. With the two selected accelerometer triads, this adds 6 extra channels, increasing deep-model input from 12 to 18 channels.
+
+### 5.5 Normalization
 
 Per-channel **z-score normalization** (zero mean, unit variance) is applied. Statistics are computed across all windows to standardize the scale of accelerometer and gyroscope signals.
 
-### 5.5 Pipeline Output
+### 5.6 Pipeline Output
 
 The preprocessed output consists of three NumPy arrays:
-- `windows_X.npy` — shape `(N, 256, 12)`: sensor windows
+- `windows_X.npy` — shape `(N, 256, 18)`: sensor windows with orientation-aware features for deep learning; classical feature extraction still operates on the full window tensor
 - `windows_y.npy` — shape `(N,)`: contiguous 0-indexed activity labels
 - `subject_ids.npy` — shape `(N,)`: subject identifier per window (for LOSO splits)
 
@@ -134,7 +144,7 @@ The preprocessed output consists of three NumPy arrays:
 
 ## 6. Feature Engineering (Classical ML)
 
-For classical machine learning models, a set of **~250 handcrafted features** is extracted from each sliding window across all 12 sensor channels. These features are grouped into four categories.
+For classical machine learning models, a set of **~368 handcrafted features** is extracted from each sliding window across all 18 input channels. These features are grouped into four categories.
 
 ### 6.1 Time-Domain Features (10 per channel)
 
@@ -169,11 +179,11 @@ For classical machine learning models, a set of **~250 handcrafted features** is
 
 | Feature Group      | Per Channel | Channels | Subtotal |
 |--------------------|:-----------:|:--------:|:--------:|
-| Time-domain        | 10          | 12       | 120      |
-| Frequency-domain   | 5           | 12       | 60       |
-| Statistical        | 5           | 12       | 60       |
+| Time-domain        | 10          | 18       | 180      |
+| Frequency-domain   | 5           | 18       | 90       |
+| Statistical        | 5           | 18       | 90       |
 | Cross-channel      | —           | —        | 8        |
-| **Total**          |             |          | **~248** |
+| **Total**          |             |          | **~368** |
 
 ---
 
@@ -183,18 +193,18 @@ For classical machine learning models, a set of **~250 handcrafted features** is
 
 | Model          | Implementation  | Key Hyperparameters                            |
 |----------------|:--------------:|------------------------------------------------|
-| Random Forest  | scikit-learn    | Ensemble of decision trees; uses all ~248 features |
+| Random Forest  | scikit-learn    | Ensemble of decision trees; uses all ~368 features |
 | SVM            | scikit-learn    | RBF kernel; regularization via C parameter      |
 | XGBoost        | XGBoost library | Gradient-boosted trees; learning rate, max depth |
 
 ### 7.2 1D Convolutional Neural Network (CNN)
 
-The CNN operates on raw sensor windows of shape `(256, 12)` and extracts local temporal patterns through successive convolutional layers.
+The CNN operates on raw sensor windows of shape `(256, 18)` and extracts local temporal patterns through successive convolutional layers.
 
 **Architecture:**
 ```
-Input (256 × 12)
-  → Conv1D(12→64, k=7, pad=3) → BatchNorm → ReLU → MaxPool(2)
+Input (256 × 18)
+  → Conv1D(18→64, k=7, pad=3) → BatchNorm → ReLU → MaxPool(2)
   → Conv1D(64→128, k=5, pad=2) → BatchNorm → ReLU → MaxPool(2)
   → Conv1D(128→256, k=3, pad=1) → BatchNorm → ReLU
   → Global Average Pooling
@@ -209,9 +219,9 @@ The recurrent models process the full 256-step sequence, capturing long-range te
 
 **Architecture:**
 ```
-Input (256 × 12)
-  → BiLSTM(input=12, hidden=128, layers=2, dropout=0.3)
-    OR BiGRU(input=12, hidden=128, layers=2, dropout=0.3)
+Input (256 × 18)
+  → BiLSTM(input=18, hidden=128, layers=2, dropout=0.3)
+    OR BiGRU(input=18, hidden=128, layers=2, dropout=0.3)
   → Last time-step output (dim = 128 × 2 = 256)
   → Dropout(0.3) → FC(256→128) → ReLU → Dropout(0.3) → FC(128→7)
 ```
@@ -224,8 +234,8 @@ The hybrid model combines the local feature extraction capability of CNNs with t
 
 **Architecture:**
 ```
-Input (256 × 12)
-  → Conv1D(12→64, k=5, pad=2) → BatchNorm → ReLU → MaxPool(2)
+Input (256 × 18)
+  → Conv1D(18→64, k=5, pad=2) → BatchNorm → ReLU → MaxPool(2)
   → Conv1D(64→128, k=5, pad=2) → BatchNorm → ReLU → MaxPool(2)
   → BiLSTM(input=128, hidden=128, layers=2, dropout=0.3)
   → Temporal Attention (softmax-weighted sum over time steps)
@@ -254,7 +264,7 @@ Six augmentation techniques are applied stochastically during training to improv
 | 5 | Permutation       | Shuffle temporal segments to break strict ordering dependency | 0.30        | 5 segments         |
 | 6 | Magnitude Warping | Sinusoidal envelope distortion for smooth amplitude variation | 0.30        | σ = 0.2           |
 
-Augmentations operate on individual windows (shape `256 × 12`) and are composed through a `ComposeAugmentations` pipeline that applies each technique independently.
+Augmentations operate on individual windows (shape `256 × 18`) and are composed through a `ComposeAugmentations` pipeline that applies each technique independently.
 
 ---
 
@@ -301,14 +311,18 @@ All models are evaluated using **Leave-One-Subject-Out (LOSO) cross-validation**
 | LR scheduler             | ReduceLROnPlateau (factor=0.5, patience=5)  |
 | Gradient clipping        | Max norm = 1.0 (for RNN stability)          |
 | Dropout rate             | 0.3                                         |
-| Loss function            | Cross-Entropy with inverse-frequency class weights |
+| Loss function            | Cross-Entropy with inverse-frequency class weights, plus optional focal loss |
 | Random seed              | 42                                          |
 
 ### 10.3 Class Imbalance Handling
 
-Class weights are computed as the inverse of per-class frequency in the training split and passed to `CrossEntropyLoss`, ensuring that minority classes (e.g., ascending stairs) contribute proportionally to the loss.
+Class weights are computed as the inverse of per-class frequency in the training split and passed to `CrossEntropyLoss`. Hard-to-separate posture classes receive a small additional boost so the learner does not overfit only the easiest dynamic activities. Focal loss can be enabled when the goal is to emphasize hard samples further.
 
-### 10.4 Evaluation Metrics
+### 10.4 Temporal Smoothing
+
+To reduce flicker in predictions and improve stability across adjacent windows, the evaluation pipeline applies a centered majority vote over a short prediction window. This is especially useful for stationary activities, where individual windows can be noisy even when the underlying posture is stable.
+
+### 10.5 Evaluation Metrics
 
 The following metrics are reported per fold and aggregated (mean ± std across 9 LOSO folds):
 
@@ -359,39 +373,86 @@ The following metrics were computed using Leave-One-Subject-Out (LOSO) cross-val
 
 ## 12. Mobile Deployment
 
-### 12.1 Export Pipeline
+The mobile app runs the trained HAR model on-device and does not require a backend once the assets are bundled. Real phone sensors feed a rolling window buffer, which is then passed through the local inference runtime and lightweight post-processing rules.
 
-The best-performing PyTorch model is exported through a multi-stage conversion:
+### 12.1 Runtime Path
 
-```
+- DeviceMotion data is collected from the phone accelerometer and gyroscope.
+- Sensor samples are smoothed and stored in a rolling window.
+- The local model runs with ONNX Runtime Web or the bundled deployment runtime.
+- Prediction smoothing and anti-spoof rules suppress false walking/lying transitions caused by noisy hand motion.
+
+### 12.2 Export Pipeline
+
+The trained PyTorch model is exported through a multi-stage conversion path when needed:
+
+```text
 PyTorch (.pt) → ONNX (.onnx) → TensorFlow SavedModel → TFLite (.tflite)
 ```
 
-### 12.2 Quantization
+The ONNX export is stored under `results/`, and the mobile bundle includes the runtime assets required for local execution.
 
-Post-training quantization reduces model size and inference latency for on-device use:
+### 12.3 Quantization Targets
+
+Post-training quantization is used to reduce model size and latency for on-device use:
 
 | Quantization Mode | Size Reduction | Expected Accuracy Impact |
 |-------------------|:--------------:|:------------------------:|
 | None (FP32)       | Baseline       | —                        |
-| Dynamic range     | ~2–3×          | Minimal                  |
-| Float16           | ~2×            | Negligible               |
-| Full INT8         | ~4×            | < 1% accuracy drop       |
+| Dynamic range     | ~2-3x          | Minimal                  |
+| Float16           | ~2x            | Negligible               |
+| Full INT8         | ~4x            | < 1% accuracy drop       |
 
-### 12.3 Deployment Targets
+### 12.4 Deployment Targets
 
-| Metric            | Target                                      |
-|-------------------|:-------------------------------------------:|
-| Model size        | < 5 MB                                      |
-| Inference latency | < 20 ms on mid-range smartphone             |
-| Runtime           | TFLite Android / iOS                        |
+| Metric            | Target                              |
+|-------------------|:-----------------------------------:|
+| Model size        | < 5 MB                              |
+| Inference latency | < 20 ms on mid-range smartphone     |
+| Runtime           | Android via Capacitor and local JS runtime |
 
-### 12.4 Mobile Application Prototype
+### 12.5 Mobile App
 
-A web-based mobile application prototype is included (`mobile_app/`) that:
-- Simulates real-time sensor data input
-- Runs activity classification with visual feedback
-- Displays activity history and confidence scores
+The `mobile_app/` directory contains the browser-based phone UI used for live inference and validation. It supports:
+
+- Real sensor mode using the browser `DeviceMotion` API
+- Simulation mode for desktop browsers or denied sensor permissions
+- A live activity card, per-class probability bars, and a running history log
+- Toasts and a sensor badge to indicate whether real sensors, waiting, or simulation are active
+
+### 12.6 Running the Mobile App
+
+The app must be served over HTTPS for the `DeviceMotion` API to function on modern phones. A local HTTPS server is included that auto-generates a self-signed TLS certificate.
+
+**Requirement:**
+```bash
+pip install cryptography
+```
+
+**Start the server:**
+```bash
+cd mobile_app
+python serve.py
+```
+
+The server prints two URLs:
+```text
+Local:    https://localhost:5500
+Network:  https://10.x.x.x:5500
+```
+
+**On your phone:**
+1. Ensure the phone and PC are on the same Wi-Fi network.
+2. Open the Network URL in the phone's browser.
+3. Accept the self-signed certificate warning (tap Advanced → Proceed).
+4. Tap Start. On Android, real sensors activate immediately. On iOS, tap "Enable Sensors" in the overlay that appears.
+
+The sensor badge in the header displays `REAL` when live sensor data is being received, `WAIT` while the listener is initialising, and `SIM` when running in simulation mode.
+
+**Custom port:**
+```bash
+python serve.py --port 9000
+```
 
 ---
 
@@ -399,13 +460,14 @@ A web-based mobile application prototype is included (`mobile_app/`) that:
 
 ### 13.1 Summary
 
-This project demonstrates a complete HAR pipeline from raw PAMAP2 sensor data to mobile deployment. Multiple classical and deep learning approaches are implemented and evaluated under the rigorous LOSO cross-validation protocol.
+This project demonstrates a complete HAR pipeline from raw PAMAP2 sensor data to mobile deployment. Multiple classical and deep learning approaches are implemented and evaluated under the rigorous LOSO cross-validation protocol, with the current pipeline emphasizing posture-aware features and class-balanced training for the hardest static classes.
 
 ### 13.2 Future Work
 
-- **Real smartphone deployment**: Replace simulated sensor data with live accelerometer/gyroscope readings on Android/iOS.
+- **Hard-negative retraining**: Add more sitting, standing, and phone-shaking samples so the model learns the toughest posture boundaries directly from data.
+- **Native mobile app**: Port the web prototype to a React Native or native Android/iOS application for access to background sensor collection, persistent logging, and app store distribution.
 - **Transformer architectures**: Investigate self-attention-based models (e.g., HAR Transformer) for longer-range temporal modelling.
-- **Federated learning**: Enable collaborative model improvement across devices without centralized data collection.
+- **Federated learning**: Enable collaborative model improvement across devices without centralised data collection.
 - **Additional activities**: Extend classification to the full 18-class PAMAP2 set or integrate activities from other datasets (WISDM, UCI-HAR).
 - **Continuous learning**: Enable on-device fine-tuning to adapt to individual users' movement patterns.
 
@@ -433,7 +495,7 @@ Human Activity/
 │   │   ├── preprocess.py          # Full preprocessing pipeline (Sec. 5)
 │   │   └── dataset.py             # PyTorch Dataset + LOSO splits
 │   ├── features/
-│   │   └── extract.py             # 248 handcrafted features (Sec. 6)
+│   │   └── extract.py             # 368 handcrafted features (Sec. 6)
 │   ├── models/
 │   │   ├── classical.py           # RF, SVM, XGBoost (Sec. 7.1)
 │   │   ├── cnn.py                 # 1D CNN (Sec. 7.2)
@@ -448,7 +510,11 @@ Human Activity/
 │   └── deploy/
 │       ├── export_tflite.py       # TFLite conversion + quantization (Sec. 12)
 │       └── export_onnx.py         # ONNX export
-├── mobile_app/                    # Web-based mobile prototype (Sec. 12.4)
+├── mobile_app/                    # Progressive web app (Sec. 12.4)
+│   ├── index.html                 # App shell and layout
+│   ├── app.js                     # Sensor handling, classifier, UI logic
+│   ├── app.css                    # Styles
+│   └── serve.py                   # Local HTTPS server (self-signed cert)
 ├── tests/                         # Unit tests
 └── results/                       # Checkpoints, figures, exported models
 ```
@@ -497,7 +563,16 @@ python -m src.training.train --model hybrid --epochs 50
 python -m src.deploy.export_tflite --model hybrid --quantize dynamic
 ```
 
-### B.6 Run Tests
+### B.6 Run the Mobile App
+
+```bash
+pip install cryptography        # one-time, if not already installed
+cd mobile_app
+python serve.py
+# Open the printed Network URL on your phone
+```
+
+### B.7 Run Tests
 
 ```bash
 python -m pytest tests/ -v

@@ -2,171 +2,220 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>HAR — Human Activity Recognition</title>
-    <meta name="description" content="Real-time Human Activity Recognition using smartphone sensors and deep learning">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Activity</title>
+
+    <!-- PWA manifest -->
+    <link rel="manifest" href="/manifest.json">
+
+    <!-- Theme -->
+    <meta name="theme-color" content="#0D0D0D">
+    <meta name="background-color" content="#0D0D0D">
+
+    <!-- iOS PWA -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Activity">
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+
+    <!-- Android / general -->
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="application-name" content="Activity">
+    <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png">
+    <link rel="icon" type="image/png" sizes="512x512" href="/icon-512.png">
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="app.css">
 </head>
 <body>
-    <div id="app">
-        <!-- Status Bar -->
-        <div class="status-bar">
-            <span class="status-time" id="statusTime">9:41</span>
-            <div class="status-icons">
-                <svg width="16" height="12" viewBox="0 0 16 12"><path d="M1 9h2v3H1zM5 6h2v6H5zM9 3h2v9H9zM13 0h2v12h-2z" fill="currentColor"/></svg>
-                <svg width="16" height="12" viewBox="0 0 16 12"><path d="M8 2C5.24 2 2.79 3.22 1.17 5.17l1.42 1.42A7.45 7.45 0 018 4a7.45 7.45 0 015.41 2.59l1.42-1.42A9.45 9.45 0 008 2zm0 4c-1.7 0-3.23.69-4.35 1.81L5.07 9.22A4.48 4.48 0 018 8c1.13 0 2.16.42 2.93 1.11l1.42-1.42A6.48 6.48 0 008 6zm0 4a2.5 2.5 0 00-1.76.73L8 12.5l1.76-1.77A2.5 2.5 0 008 10z" fill="currentColor"/></svg>
-                <div class="battery-icon"><div class="battery-fill"></div></div>
-            </div>
-        </div>
 
-        <!-- Header -->
-        <header class="header">
-            <div class="header-top">
-                <div class="logo-section">
-                    <div class="logo-icon">
-                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M18 20V10M12 20V4M6 20v-6"/>
-                        </svg>
-                    </div>
-                    <div>
-                        <h1>HAR System</h1>
-                        <p class="subtitle">Activity Recognition</p>
-                    </div>
-                </div>
-                <button class="settings-btn" id="settingsBtn" aria-label="Settings">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <circle cx="12" cy="12" r="3"/><path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83"/>
-                    </svg>
-                </button>
-            </div>
-        </header>
+<!-- iOS permission overlay -->
+<div id="permOverlay" class="perm-overlay hidden">
+    <p class="perm-icon-text">SENSORS</p>
+    <h2>Enable Motion Sensors</h2>
+    <p class="perm-msg">This app reads your phone's accelerometer and gyroscope to recognise activities in real time.</p>
+    <button class="perm-btn" id="permBtn">ENABLE</button>
+    <button class="perm-skip" onclick="document.getElementById('permOverlay').classList.add('hidden')">Use simulation instead</button>
+</div>
 
-        <!-- Main Content -->
-        <main class="main-content">
-            <!-- Activity Display -->
-            <section class="activity-card" id="activityCard">
-                <div class="activity-ring" id="activityRing">
-                    <svg viewBox="0 0 200 200" class="ring-svg">
-                        <circle cx="100" cy="100" r="85" class="ring-bg"/>
-                        <circle cx="100" cy="100" r="85" class="ring-progress" id="ringProgress" 
-                                stroke-dasharray="534" stroke-dashoffset="134"/>
-                    </svg>
-                    <div class="activity-center">
-                        <div class="activity-emoji" id="activityEmoji">🚶</div>
-                        <div class="activity-label" id="activityLabel">Walking</div>
-                        <div class="activity-confidence" id="activityConfidence">87%</div>
-                    </div>
-                </div>
-                <div class="activity-status">
-                    <div class="status-dot active" id="statusDot"></div>
-                    <span id="statusText">Recognizing activities...</span>
-                </div>
-            </section>
+<div id="app">
 
-            <!-- Confidence Bars -->
-            <section class="confidence-section">
-                <h2 class="section-title">Class Probabilities</h2>
-                <div class="confidence-bars" id="confidenceBars">
-                    <!-- Populated by JS -->
-                </div>
-            </section>
-
-            <!-- Sensor Data -->
-            <section class="sensor-section">
-                <h2 class="section-title">Live Sensor Data</h2>
-                <div class="sensor-tabs">
-                    <button class="sensor-tab active" data-sensor="accel" id="tabAccel">Accelerometer</button>
-                    <button class="sensor-tab" data-sensor="gyro" id="tabGyro">Gyroscope</button>
-                </div>
-                <div class="sensor-chart" id="sensorChart">
-                    <canvas id="sensorCanvas" width="400" height="180"></canvas>
-                </div>
-                <div class="sensor-values" id="sensorValues">
-                    <div class="sensor-axis x"><span class="axis-label">X</span><span class="axis-value" id="axisX">0.00</span></div>
-                    <div class="sensor-axis y"><span class="axis-label">Y</span><span class="axis-value" id="axisY">0.00</span></div>
-                    <div class="sensor-axis z"><span class="axis-label">Z</span><span class="axis-value" id="axisZ">0.00</span></div>
-                </div>
-            </section>
-
-            <!-- Activity History -->
-            <section class="history-section">
-                <h2 class="section-title">Activity Timeline</h2>
-                <div class="history-list" id="historyList">
-                    <!-- Populated by JS -->
-                </div>
-            </section>
-
-            <!-- Stats Cards -->
-            <section class="stats-section">
-                <h2 class="section-title">Session Stats</h2>
-                <div class="stats-grid">
-                    <div class="stat-card">
-                        <div class="stat-icon">⏱️</div>
-                        <div class="stat-value" id="statDuration">00:00</div>
-                        <div class="stat-label">Duration</div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-icon">📊</div>
-                        <div class="stat-value" id="statInferences">0</div>
-                        <div class="stat-label">Inferences</div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-icon">⚡</div>
-                        <div class="stat-value" id="statLatency">0ms</div>
-                        <div class="stat-label">Latency</div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-icon">🎯</div>
-                        <div class="stat-value" id="statAvgConf">0%</div>
-                        <div class="stat-label">Avg Conf.</div>
-                    </div>
-                </div>
-            </section>
-
-            <!-- Model Info -->
-            <section class="model-section">
-                <h2 class="section-title">Model Info</h2>
-                <div class="model-card">
-                    <div class="model-row"><span>Architecture</span><span class="model-value">CNN-LSTM Hybrid</span></div>
-                    <div class="model-row"><span>Parameters</span><span class="model-value">847K</span></div>
-                    <div class="model-row"><span>Quantization</span><span class="model-value">INT8</span></div>
-                    <div class="model-row"><span>Model Size</span><span class="model-value">2.1 MB</span></div>
-                    <div class="model-row"><span>Window Size</span><span class="model-value">256 × 12</span></div>
-                    <div class="model-row"><span>Sample Rate</span><span class="model-value">50 Hz</span></div>
-                </div>
-            </section>
-        </main>
-
-        <!-- Bottom Control Bar -->
-        <div class="control-bar">
-            <button class="control-btn" id="btnStart" aria-label="Start recognition">
-                <div class="control-btn-inner start">
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
-                        <polygon points="5,3 19,12 5,21"/>
-                    </svg>
-                </div>
-                <span>Start</span>
-            </button>
-            <button class="control-btn" id="btnPause" aria-label="Pause recognition">
-                <div class="control-btn-inner pause">
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
-                        <rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/>
-                    </svg>
-                </div>
-                <span>Pause</span>
-            </button>
-            <button class="control-btn" id="btnReset" aria-label="Reset session">
-                <div class="control-btn-inner reset">
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <polyline points="23,4 23,10 17,10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
-                    </svg>
-                </div>
-                <span>Reset</span>
-            </button>
+    <!-- Status Bar -->
+    <div class="status-bar">
+        <span id="statusTime" class="status-time">9:41</span>
+        <div class="status-icons">
+            <svg width="14" height="10" viewBox="0 0 16 12"><path d="M1 9h2v3H1zM5 6h2v6H5zM9 3h2v9H9zM13 0h2v12h-2z" fill="currentColor"/></svg>
+            <svg width="14" height="10" viewBox="0 0 16 12"><path d="M8 2C5.24 2 2.79 3.22 1.17 5.17l1.42 1.42A7.45 7.45 0 018 4a7.45 7.45 0 015.41 2.59l1.42-1.42A9.45 9.45 0 008 2zm0 4c-1.7 0-3.23.69-4.35 1.81L5.07 9.22A4.48 4.48 0 018 8c1.13 0 2.16.42 2.93 1.11l1.42-1.42A6.48 6.48 0 008 6zm0 4a2.5 2.5 0 00-1.76.73L8 12.5l1.76-1.77A2.5 2.5 0 008 10z" fill="currentColor"/></svg>
+            <div class="battery-icon"><div class="battery-fill"></div></div>
         </div>
     </div>
 
-    <script src="app.js"></script>
+    <!-- App Bar -->
+    <header class="app-bar">
+        <button class="icon-btn" id="settingsBtn" aria-label="Settings">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="3"/>
+                <path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83"/>
+            </svg>
+        </button>
+        <h1 class="app-title">ACTIVITY</h1>
+        <span id="sensorBadge" class="sensor-badge sim">SIM</span>
+    </header>
+
+    <!-- Sensor Tab Strip -->
+    <div class="tab-strip">
+        <button class="strip-tab active" id="tabAccel" data-sensor="accel">ACCEL</button>
+        <button class="strip-tab" id="tabGyro" data-sensor="gyro">GYRO</button>
+        <button class="strip-tab" id="tabInfo">INFO</button>
+    </div>
+
+    <!-- Scrollable content -->
+    <main class="main-content">
+
+        <!-- Hero -->
+        <section class="hero">
+            <div class="hero-date" id="heroDate">TODAY</div>
+            <div class="hero-emoji" id="activityEmoji">--</div>
+            <div class="hero-number" id="activityConfidence">0%</div>
+            <div class="hero-label" id="activityLabel">WAITING</div>
+            <div class="hero-bar-track">
+                <div class="hero-bar-fill" id="heroBarFill"></div>
+            </div>
+            <div class="hero-status">
+                <span class="status-dot" id="statusDot"></span>
+                <span id="statusText">Ready to start</span>
+            </div>
+        </section>
+
+        <!-- Quick stats row -->
+        <section class="stats-row">
+            <div class="stat-item">
+                <div class="stat-icon-circle" style="background:#C9F31D22; border-color:#C9F31D44">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#C9F31D" stroke-width="2.2">
+                        <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+                    </svg>
+                </div>
+                <div class="stat-num" id="statDuration">00:00</div>
+                <div class="stat-lbl">DURATION</div>
+            </div>
+            <div class="stat-divider"></div>
+            <div class="stat-item">
+                <div class="stat-icon-circle" style="background:#FF6D0022; border-color:#FF6D0044">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#FF6D00" stroke-width="2.2">
+                        <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+                    </svg>
+                </div>
+                <div class="stat-num" id="statInferences">0</div>
+                <div class="stat-lbl">SAMPLES</div>
+            </div>
+            <div class="stat-divider"></div>
+            <div class="stat-item">
+                <div class="stat-icon-circle" style="background:#00E67622; border-color:#00E67644">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#00E676" stroke-width="2.2">
+                        <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+                    </svg>
+                </div>
+                <div class="stat-num" id="statLatency">--</div>
+                <div class="stat-lbl">LATENCY</div>
+            </div>
+            <div class="stat-divider"></div>
+            <div class="stat-item">
+                <div class="stat-icon-circle" style="background:#FF174422; border-color:#FF174444">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#FF1744" stroke-width="2.2">
+                        <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
+                    </svg>
+                </div>
+                <div class="stat-num" id="statAvgConf">--</div>
+                <div class="stat-lbl">AVG CONF</div>
+            </div>
+        </section>
+
+        <!-- Live Sensor Feed -->
+        <section class="section">
+            <div class="section-header">
+                <span class="section-title">LIVE SENSOR</span>
+                <div class="axis-legend">
+                    <span class="legend-dot" style="background:#EF6C6C"></span><span>X</span>
+                    <span class="legend-dot" style="background:#4ADE80"></span><span>Y</span>
+                    <span class="legend-dot" style="background:#60A5FA"></span><span>Z</span>
+                </div>
+            </div>
+            <div class="chart-area">
+                <canvas id="sensorCanvas"></canvas>
+            </div>
+            <div class="axis-values">
+                <span class="av-item x"><span class="av-val" id="axisX">0.00</span><span class="av-lbl">X</span></span>
+                <span class="av-item y"><span class="av-val" id="axisY">0.00</span><span class="av-lbl">Y</span></span>
+                <span class="av-item z"><span class="av-val" id="axisZ">0.00</span><span class="av-lbl">Z</span></span>
+            </div>
+        </section>
+
+        <!-- Activity Classes — vertical bar chart -->
+        <section class="section">
+            <div class="section-header">
+                <span class="section-title">ACTIVITY CLASSES</span>
+            </div>
+            <div class="bar-chart" id="barChart">
+                <!-- Populated by JS -->
+            </div>
+        </section>
+
+        <!-- History timeline -->
+        <section class="section">
+            <div class="section-header">
+                <span class="section-title">HISTORY</span>
+            </div>
+            <div class="history-list" id="historyList">
+                <p class="empty-state">Start to see activity history</p>
+            </div>
+        </section>
+
+        <!-- Model details (collapsible) -->
+        <section class="section">
+            <div class="section-header clickable" id="modelToggle">
+                <span class="section-title">MODEL DETAILS</span>
+                <svg class="chevron" id="modelChevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+            </div>
+            <div class="model-table" id="modelRows">
+                <div class="model-row"><span>Architecture</span><span class="mv">CNN-LSTM Hybrid</span></div>
+                <div class="model-row"><span>Parameters</span><span class="mv">847 K</span></div>
+                <div class="model-row"><span>Quantization</span><span class="mv">INT8</span></div>
+                <div class="model-row"><span>Model Size</span><span class="mv">2.1 MB</span></div>
+                <div class="model-row"><span>Window</span><span class="mv">256 x 12</span></div>
+                <div class="model-row"><span>Sample Rate</span><span class="mv">50 Hz</span></div>
+                <div class="model-row"><span>Best Accuracy</span><span class="mv accent">95.8%</span></div>
+            </div>
+        </section>
+
+        <div style="height:8px"></div>
+    </main>
+
+    <!-- Bottom control bar -->
+    <nav class="bottom-bar">
+        <button class="ctrl-btn secondary" id="btnReset">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+                <polyline points="23,4 23,10 17,10"/>
+                <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
+            </svg>
+            <span>RESET</span>
+        </button>
+        <button class="ctrl-btn primary" id="btnStart">
+            <svg id="playIcon" width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><polygon points="5,3 19,12 5,21"/></svg>
+            <span id="primaryLabel">START</span>
+        </button>
+        <button class="ctrl-btn secondary" id="btnPause">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                <rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/>
+            </svg>
+            <span>PAUSE</span>
+        </button>
+    </nav>
+
+</div>
+
+<script src="vendor/onnx/ort.min.js"></script>
+<script src="vendor/tf/tf.min.js"></script>
+<script src="app.js"></script>
 </body>
 </html>

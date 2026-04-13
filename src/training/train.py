@@ -28,6 +28,26 @@ from src.data.dataset import (
 from src.training.evaluate import evaluate_model, print_fold_summary
 
 
+class FocalCrossEntropy(nn.Module):
+    """Class-weighted focal cross entropy for hard-sample emphasis."""
+
+    def __init__(self, alpha=None, gamma=1.5):
+        super().__init__()
+        self.alpha = alpha
+        self.gamma = gamma
+
+    def forward(self, logits, targets):
+        ce = nn.functional.cross_entropy(
+            logits,
+            targets,
+            weight=self.alpha,
+            reduction='none',
+        )
+        pt = torch.exp(-ce)
+        focal = ((1.0 - pt) ** self.gamma) * ce
+        return focal.mean()
+
+
 def get_model_by_name(model_name: str, **kwargs):
     """Get a deep learning model by name."""
     if model_name == 'cnn':
@@ -139,12 +159,15 @@ def train_single_fold(model_name, X, y, train_idx, test_idx, fold,
         X, y, train_idx, test_idx, transform=transform
     )
 
-    # Initialize model
-    model = get_model_by_name(model_name).to(device)
+    # Initialize model (supports dynamic channels if preprocessing adds features).
+    model = get_model_by_name(model_name, num_channels=X.shape[-1]).to(device)
 
     # Compute class weights from training data
     class_weights = compute_class_weights(y[train_idx]).to(device)
-    criterion = nn.CrossEntropyLoss(weight=class_weights)
+    if config.USE_FOCAL_LOSS:
+        criterion = FocalCrossEntropy(alpha=class_weights, gamma=config.FOCAL_GAMMA)
+    else:
+        criterion = nn.CrossEntropyLoss(weight=class_weights)
 
     # Optimizer and scheduler
     optimizer = Adam(
@@ -291,7 +314,7 @@ def train_loso(model_name: str, num_epochs=None, transform=None,
             'fold': best_fold['fold'],
             'accuracy': best_fold['accuracy'],
             'config': {
-                'num_channels': config.NUM_CHANNELS,
+                'num_channels': X.shape[-1],
                 'num_classes': config.NUM_CLASSES,
                 'window_size': config.WINDOW_SIZE,
             },

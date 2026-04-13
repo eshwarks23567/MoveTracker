@@ -32,6 +32,8 @@ results/checkpoints/*.pth
 results/*.onnx
 results/*.tflite
 results/tf_savedmodel/
+results/evaluation_results.json
+results/figures/
 
 # OS
 .DS_Store
@@ -42,3 +44,8 @@ desktop.ini
 *.log
 wandb/
 runs/
+
+# Mobile app generated artifacts
+mobile_app/node_modules/
+mobile_app/android/
+mobile_app/www/

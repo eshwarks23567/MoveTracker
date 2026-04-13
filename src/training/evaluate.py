@@ -24,6 +24,25 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 import config
 
 
+def temporal_majority_vote(y_pred: np.ndarray, window: int = None) -> np.ndarray:
+    """Apply centered majority vote smoothing on prediction sequence."""
+    window = window or config.MAJORITY_VOTE_WINDOW
+    if window <= 1 or len(y_pred) == 0:
+        return y_pred
+
+    radius = window // 2
+    out = np.empty_like(y_pred)
+
+    for i in range(len(y_pred)):
+        lo = max(0, i - radius)
+        hi = min(len(y_pred), i + radius + 1)
+        local = y_pred[lo:hi]
+        # np.bincount + argmax gives deterministic majority label.
+        out[i] = np.bincount(local).argmax()
+
+    return out
+
+
 @torch.no_grad()
 def get_predictions(model, data_loader, device):
     """
@@ -62,7 +81,10 @@ def evaluate_model(model, data_loader, device) -> dict:
     -------
     metrics : dict with accuracy, f1, precision, recall, confusion matrix, etc.
     """
-    y_true, y_pred, y_probs = get_predictions(model, data_loader, device)
+    y_true, y_pred_raw, y_probs = get_predictions(model, data_loader, device)
+
+    # Smooth short temporal flicker without changing probabilities.
+    y_pred = temporal_majority_vote(y_pred_raw, config.MAJORITY_VOTE_WINDOW)
 
     all_labels = list(range(config.NUM_CLASSES))
     target_names = [config.IDX_TO_ACTIVITY.get(i, f'cls_{i}') for i in all_labels]
@@ -75,6 +97,7 @@ def evaluate_model(model, data_loader, device) -> dict:
         'recall_weighted': recall_score(y_true, y_pred, average='weighted', zero_division=0, labels=all_labels),
         'confusion_matrix': confusion_matrix(y_true, y_pred, labels=all_labels),
         'y_true': y_true,
+        'y_pred_raw': y_pred_raw,
         'y_pred': y_pred,
         'y_probs': y_probs,
         'classification_report': classification_report(

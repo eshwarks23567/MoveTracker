@@ -43,13 +43,15 @@ def load_pytorch_model(model_name: str, checkpoint_path: str = None):
         checkpoint_path = config.CHECKPOINTS_DIR / f"{model_name}_best.pt"
 
     checkpoint = torch.load(checkpoint_path, map_location='cpu')
+    ckpt_cfg = checkpoint.get('config', {}) if isinstance(checkpoint, dict) else {}
+    num_channels = int(ckpt_cfg.get('num_channels', config.NUM_CHANNELS))
 
-    model = get_model_by_name(model_name)
+    model = get_model_by_name(model_name, num_channels=num_channels)
     model.load_state_dict(checkpoint['model_state_dict'])
     model.eval()
 
     print(f"✅ Loaded {model_name} model from {checkpoint_path}")
-    return model
+    return model, num_channels
 
 
 def export_to_onnx(model, model_name: str, output_path: str = None,
@@ -269,10 +271,10 @@ def full_export_pipeline(model_name: str, quantize: str = 'dynamic'):
     print(f"{'=' * 60}")
 
     # Load model
-    model = load_pytorch_model(model_name)
+    model, num_channels = load_pytorch_model(model_name)
 
     # Export to ONNX
-    onnx_path = export_to_onnx(model, model_name)
+    onnx_path = export_to_onnx(model, model_name, num_channels=num_channels)
 
     # Convert to TFLite
     tflite_path = convert_onnx_to_tflite(onnx_path, quantize=quantize)

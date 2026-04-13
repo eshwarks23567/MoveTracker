@@ -38,12 +38,15 @@ def export_to_onnx(model_name: str, checkpoint_path: str = None,
 
     # Load model
     checkpoint = torch.load(str(checkpoint_path), map_location='cpu')
-    model = get_model_by_name(model_name)
+    ckpt_cfg = checkpoint.get('config', {}) if isinstance(checkpoint, dict) else {}
+    num_channels = int(ckpt_cfg.get('num_channels', config.NUM_CHANNELS))
+
+    model = get_model_by_name(model_name, num_channels=num_channels)
     model.load_state_dict(checkpoint['model_state_dict'])
     model.eval()
 
     # Create dummy input
-    dummy = torch.randn(1, config.WINDOW_SIZE, config.NUM_CHANNELS)
+    dummy = torch.randn(1, config.WINDOW_SIZE, num_channels)
 
     # Export
     torch.onnx.export(
@@ -92,7 +95,7 @@ def verify_onnx(onnx_path: str, num_samples: int = 10):
 
         # Random inputs
         for _ in range(num_samples):
-            x = np.random.randn(1, config.WINDOW_SIZE, config.NUM_CHANNELS).astype(np.float32)
+            x = np.random.randn(1, config.WINDOW_SIZE, session.get_inputs()[0].shape[-1]).astype(np.float32)
             ort_inputs = {'sensor_data': x}
             ort_outputs = session.run(None, ort_inputs)
 

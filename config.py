@@ -90,6 +90,13 @@ WINDOW_SIZE = 256          # samples (2.56 s at 100 Hz)
 WINDOW_OVERLAP = 0.5       # 50% overlap
 WINDOW_STEP = int(WINDOW_SIZE * (1 - WINDOW_OVERLAP))  # 128
 
+# ─── Feature Engineering (for deep models) ───────────────────────────────────
+# Add gravity-orientation cues to improve sitting vs standing separation.
+ADD_ORIENTATION_FEATURES = True
+# For each accelerometer triad (ax, ay, az): add [pitch, roll, acc_mag].
+# Current setup uses 2 accel triads (hand, ankle), so +6 channels when enabled.
+ORIENTATION_FEATURES_PER_TRIAD = 3
+
 # ─── Preprocessing ────────────────────────────────────────────────────────────
 MAX_INTERP_GAP = 10        # Max consecutive NaN samples to interpolate
 LOWPASS_CUTOFF = 20        # Hz — Butterworth filter cutoff
@@ -104,6 +111,18 @@ NUM_EPOCHS = 50
 EARLY_STOPPING_PATIENCE = 10
 DROPOUT_RATE = 0.3
 RANDOM_SEED = 42
+
+# Loss shaping for hard classes.
+USE_FOCAL_LOSS = False
+FOCAL_GAMMA = 1.5
+# Additional multiplier on top of inverse-frequency weights.
+HARD_CLASS_WEIGHT_MULTIPLIER = {
+    1: 1.10,  # sitting
+    2: 1.10,  # standing
+}
+
+# Post-eval temporal smoothing by local majority vote.
+MAJORITY_VOTE_WINDOW = 5
 
 # ─── Augmentation ─────────────────────────────────────────────────────────────
 JITTER_SIGMA = 0.05
